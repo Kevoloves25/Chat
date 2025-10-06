@@ -2,47 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads (simplified for Termux)
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 10 * 1024 * 1024,
-    },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif|webp/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-        
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb(new Error('Only image files are allowed'));
-        }
-    }
-});
 
 // Security middleware
 app.use(helmet({
@@ -59,9 +22,8 @@ app.use(helmet({
 }));
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
-app.use('/uploads', express.static('uploads'));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -325,169 +287,6 @@ app.post('/api/generate-image', validateApiKey, async (req, res) => {
     }
 });
 
-// Image editing endpoint (simplified for Termux - no sharp processing)
-app.post('/api/edit-image', upload.single('image'), validateApiKey, async (req, res) => {
-    try {
-        const { prompt, apiKey } = req.body;
-
-        if (!req.file) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Image file is required' 
-            });
-        }
-
-        if (!prompt) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Prompt is required' 
-            });
-        }
-
-        // For Termux, we'll just return the uploaded file info
-        // since image editing requires sharp which doesn't work on Android
-        res.json({
-            success: true,
-            message: 'Image editing requires additional dependencies not available on Termux',
-            fileInfo: {
-                originalName: req.file.originalname,
-                filename: req.file.filename,
-                path: `/uploads/${req.file.filename}`,
-                size: req.file.size
-            }
-        });
-
-    } catch (error) {
-        console.error('Image editing error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Image editing not available on this platform' 
-        });
-    }
-});
-
-// File upload endpoint (simplified - no thumbnail generation)
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'No file uploaded' 
-            });
-        }
-
-        res.json({
-            success: true,
-            file: {
-                originalName: req.file.originalname,
-                filename: req.file.filename,
-                path: `/uploads/${req.file.filename}`,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                uploadedAt: new Date().toISOString()
-            }
-        });
-
-    } catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'File upload failed' 
-        });
-    }
-});
-
-// File download endpoint
-app.get('/api/download/:filename', (req, res) => {
-    try {
-        const filename = req.params.filename;
-        const filePath = path.join(__dirname, 'uploads', filename);
-
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ 
-                success: false,
-                error: 'File not found' 
-            });
-        }
-
-        res.download(filePath);
-
-    } catch (error) {
-        console.error('Download error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'File download failed' 
-        });
-    }
-});
-
-// Get uploaded files list
-app.get('/api/files', (req, res) => {
-    try {
-        if (!fs.existsSync(uploadsDir)) {
-            return res.json({ 
-                success: true,
-                files: [] 
-            });
-        }
-
-        const files = fs.readdirSync(uploadsDir)
-            .map(file => {
-                const filePath = path.join(uploadsDir, file);
-                const stats = fs.statSync(filePath);
-                return {
-                    filename: file,
-                    path: `/uploads/${file}`,
-                    size: stats.size,
-                    uploadedAt: stats.birthtime,
-                    isImage: /\.(jpg|jpeg|png|gif|webp)$/i.test(file)
-                };
-            });
-
-        res.json({ 
-            success: true,
-            files 
-        });
-    } catch (error) {
-        console.error('Files list error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Could not retrieve files list' 
-        });
-    }
-});
-
-// Delete file endpoint
-app.delete('/api/files/:filename', (req, res) => {
-    try {
-        const filename = req.params.filename;
-        const filePath = path.join(__dirname, 'uploads', filename);
-
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ 
-                success: false,
-                error: 'File not found' 
-            });
-        }
-
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-
-        res.json({ 
-            success: true, 
-            message: 'File deleted successfully' 
-        });
-
-    } catch (error) {
-        console.error('Delete error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'File deletion failed' 
-        });
-    }
-});
-
 // Validate API key endpoint
 app.post('/api/validate-key', validateApiKey, async (req, res) => {
     try {
@@ -523,12 +322,9 @@ app.post('/api/validate-key', validateApiKey, async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    const uploadsAvailable = fs.existsSync(uploadsDir);
-    
     res.json({ 
         success: true,
         status: 'OK', 
-        uploadsAvailable: uploadsAvailable,
         timestamp: new Date().toISOString(),
         message: 'Server ready - configure your API key in settings',
         platform: 'Termux/Android'
@@ -540,24 +336,6 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Error handling
-app.use((error, req, res, next) => {
-    if (error instanceof multer.MulterError) {
-        if (error.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({
-                success: false,
-                error: 'File too large. Maximum size is 10MB.'
-            });
-        }
-    }
-    
-    console.error('Unhandled error:', error);
-    res.status(500).json({ 
-        success: false,
-        error: 'Internal server error' 
-    });
-});
-
 // 404 handler
 app.use('/api/*', (req, res) => {
     res.status(404).json({
@@ -567,8 +345,7 @@ app.use('/api/*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Termux-Compatible AI Server running on port ${PORT}`);
-    console.log(`📱 Open http://localhost:${PORT} in your browser`);
-    console.log(`🖼️  Uploads directory: ${uploadsDir}`);
-    console.log(`🔐 No external dependencies needed - ready for Termux!`);
+    console.log(`🚀 Termux AI Server running on port ${PORT}`);
+    console.log(`📱 Open http://localhost:3000 in your browser`);
+    console.log(`✅ No problematic dependencies - ready to use!`);
 });
