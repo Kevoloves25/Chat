@@ -197,7 +197,7 @@ body {
     font-size: 0.5rem;
 }
 
-.files-btn {
+.files-btn, .settings-btn {
     width: 100%;
     padding: 0.75rem;
     background: transparent;
@@ -213,7 +213,7 @@ body {
     transition: all 0.3s ease;
 }
 
-.files-btn:hover {
+.files-btn:hover, .settings-btn:hover {
     background-color: var(--hover-light);
     color: var(--text-light);
 }
@@ -879,6 +879,90 @@ body {
     font-size: 0.75rem;
     overflow-x: auto;
     margin-top: 0.5rem;
+}
+
+/* API Key Settings */
+.setup-steps {
+    text-align: left;
+    margin: 1.5rem 0;
+}
+
+.step {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--primary-dark);
+    border-radius: 0.5rem;
+    border-left: 3px solid var(--accent-purple);
+}
+
+.step strong {
+    color: var(--accent-blue);
+    font-size: 0.875rem;
+}
+
+.step p {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.8rem;
+    color: var(--text-gray);
+}
+
+.step a {
+    color: var(--accent-blue);
+    text-decoration: none;
+}
+
+.step a:hover {
+    text-decoration: underline;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--primary-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus {
+    border-color: var(--accent-purple);
+}
+
+.save-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, var(--accent-purple), var(--accent-navy));
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.save-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(109, 40, 217, 0.3);
 }
 
 /* Responsive Design */
