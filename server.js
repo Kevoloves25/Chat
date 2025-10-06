@@ -6,7 +6,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,7 +30,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB limit
+        fileSize: 10 * 1024 * 1024,
     },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif|webp/;
@@ -68,14 +67,36 @@ app.use('/uploads', express.static('uploads'));
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 1 * 60 * 1000,
-    max: 60,
+    max: 30,
     message: { error: 'Too many requests from this IP, please try again later.' }
 });
 app.use('/api/', limiter);
 
+// API key validation middleware
+const validateApiKey = (req, res, next) => {
+    const apiKey = req.body.apiKey;
+    
+    if (!apiKey) {
+        return res.status(400).json({ 
+            success: false,
+            error: 'API key is required' 
+        });
+    }
+
+    if (apiKey.length < 20) {
+        return res.status(400).json({ 
+            success: false,
+            error: 'Invalid API key format' 
+        });
+    }
+
+    req.apiKey = apiKey;
+    next();
+};
+
 // Enhanced system instructions
 const SYSTEM_INSTRUCTIONS = {
-    'deepseek/deepseek-chat': `You are DeepSeek AI, a helpful assistant. Format your responses with:
+    'deepseek/deepseek-chat': `You are DeepSeek AI. Format responses with:
 - Use *bold* for emphasis
 - Use \`code\` for inline code
 - Use \`\`\`language\ncode\n\`\`\` for code blocks
@@ -83,19 +104,16 @@ const SYSTEM_INSTRUCTIONS = {
 - Use - for lists
 - Be concise but helpful`,
 
-    'deepseek/deepseek-coder': `You are DeepSeek Coder, specialized in programming. Format responses with:
+    'deepseek/deepseek-coder': `You are DeepSeek Coder. Format responses with:
 - Use *bold* for important concepts
 - Always use proper code formatting
 - Explain complex code with comments
-- Provide practical examples
-- Include error handling where relevant`,
+- Provide practical examples`,
 
     'openai/gpt-4': `You are GPT-4. Format responses clearly using:
 * Bold text for key points
 \`Inline code\` for technical terms
-\`\`\`
-Code blocks for examples
-\`\`\`
+\`\`\`Code blocks for examples\`\`\`
 > Quotes for important notes
 - Bullet points for lists`,
 
@@ -107,7 +125,7 @@ Code blocks for examples
 - for lists`
 };
 
-// Model configuration with capabilities
+// Model configuration
 const MODEL_CONFIG = {
     'deepseek/deepseek-chat': {
         name: 'DeepSeek Chat',
@@ -152,18 +170,11 @@ app.get('/api/models', (req, res) => {
     });
 });
 
-// Enhanced chat endpoint with JSON mode support
-app.post('/api/chat', async (req, res) => {
+// Enhanced chat endpoint
+app.post('/api/chat', validateApiKey, async (req, res) => {
     try {
         const { messages, model, format, options = {} } = req.body;
-        const apiKey = process.env.OPENROUTER_API_KEY;
-
-        if (!apiKey) {
-            return res.status(500).json({ 
-                success: false,
-                error: 'Server configuration error: API key not configured' 
-            });
-        }
+        const apiKey = req.apiKey;
 
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({ 
@@ -174,7 +185,6 @@ app.post('/api/chat', async (req, res) => {
 
         const modelConfig = MODEL_CONFIG[model] || MODEL_CONFIG['deepseek/deepseek-chat'];
         
-        // Prepare messages with system instruction
         const chatMessages = [
             {
                 role: 'system',
@@ -192,12 +202,9 @@ app.post('/api/chat', async (req, res) => {
             stream: false
         };
 
-        // Add JSON mode if supported and requested
         if (modelConfig.supportsJson && format === 'json') {
             requestBody.response_format = { type: 'json_object' };
         }
-
-        console.log('Sending request to OpenRouter:', { model, messageCount: messages.length });
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
@@ -205,18 +212,28 @@ app.post('/api/chat', async (req, res) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
                 'HTTP-Referer': req.headers.origin || 'http://localhost:3000',
-                'X-Title': 'Advanced AI Chat'
+                'X-Title': 'AI Chat'
             },
             body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OpenRouter API error:', response.status, errorText);
-            return res.status(response.status).json({ 
-                success: false,
-                error: `AI service error: ${response.statusText}` 
-            });
+            if (response.status === 401) {
+                return res.status(401).json({ 
+                    success: false,
+                    error: 'Invalid API key' 
+                });
+            } else if (response.status === 429) {
+                return res.status(429).json({ 
+                    success: false,
+                    error: 'Rate limit exceeded' 
+                });
+            } else {
+                return res.status(response.status).json({ 
+                    success: false,
+                    error: 'AI service error' 
+                });
+            }
         }
 
         const data = await response.json();
@@ -229,52 +246,39 @@ app.post('/api/chat', async (req, res) => {
                 model: data.model
             };
 
-            // If JSON was requested, try to parse it
             if (format === 'json') {
                 try {
                     result.json = JSON.parse(data.choices[0].message.content);
                 } catch (e) {
-                    console.warn('JSON parsing failed:', e.message);
                     result.json = null;
                 }
             }
 
             res.json(result);
         } else {
-            throw new Error('Invalid response format from AI service');
+            throw new Error('Invalid response format');
         }
 
     } catch (error) {
         console.error('Chat error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Internal server error',
-            details: error.message 
+            error: 'Service temporarily unavailable' 
         });
     }
 });
 
 // Image generation endpoint
-app.post('/api/generate-image', async (req, res) => {
+app.post('/api/generate-image', validateApiKey, async (req, res) => {
     try {
-        const { prompt, model = 'openai/dall-e-3', size = '1024x1024', quality = 'standard' } = req.body;
-        const apiKey = process.env.OPENROUTER_API_KEY;
-
-        if (!apiKey) {
-            return res.status(500).json({ 
-                success: false,
-                error: 'Server configuration error: API key not configured' 
-            });
-        }
+        const { prompt, model = 'openai/dall-e-3', size = '1024x1024', quality = 'standard', apiKey } = req.body;
 
         if (!prompt) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Prompt is required for image generation' 
+                error: 'Prompt is required' 
             });
         }
-
-        console.log('Generating image with prompt:', prompt);
 
         const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
             method: 'POST',
@@ -294,11 +298,9 @@ app.post('/api/generate-image', async (req, res) => {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Image generation error:', response.status, errorText);
             return res.status(response.status).json({ 
                 success: false,
-                error: `Image generation failed: ${response.statusText}` 
+                error: 'Image generation failed' 
             });
         }
 
@@ -312,31 +314,22 @@ app.post('/api/generate-image', async (req, res) => {
                 model: data.model
             });
         } else {
-            throw new Error('Invalid response format from image generation service');
+            throw new Error('Invalid response format');
         }
 
     } catch (error) {
         console.error('Image generation error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Image generation failed',
-            details: error.message 
+            error: 'Image generation failed' 
         });
     }
 });
 
 // Image editing endpoint
-app.post('/api/edit-image', upload.single('image'), async (req, res) => {
+app.post('/api/edit-image', upload.single('image'), validateApiKey, async (req, res) => {
     try {
-        const { prompt } = req.body;
-        const apiKey = process.env.OPENROUTER_API_KEY;
-
-        if (!apiKey) {
-            return res.status(500).json({ 
-                success: false,
-                error: 'Server configuration error: API key not configured' 
-            });
-        }
+        const { prompt, apiKey } = req.body;
 
         if (!req.file) {
             return res.status(400).json({ 
@@ -348,13 +341,11 @@ app.post('/api/edit-image', upload.single('image'), async (req, res) => {
         if (!prompt) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Prompt is required for image editing' 
+                error: 'Prompt is required' 
             });
         }
 
-        console.log('Editing image with prompt:', prompt);
-
-        // For OpenRouter, we need to send the image as base64
+        // Convert image to base64
         const imageBuffer = fs.readFileSync(req.file.path);
         const base64Image = imageBuffer.toString('base64');
 
@@ -381,11 +372,9 @@ app.post('/api/edit-image', upload.single('image'), async (req, res) => {
         fs.unlinkSync(req.file.path);
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Image editing error:', response.status, errorText);
             return res.status(response.status).json({ 
                 success: false,
-                error: `Image editing failed: ${response.statusText}` 
+                error: 'Image editing failed' 
             });
         }
 
@@ -398,15 +387,14 @@ app.post('/api/edit-image', upload.single('image'), async (req, res) => {
                 model: data.model
             });
         } else {
-            throw new Error('Invalid response format from image editing service');
+            throw new Error('Invalid response format');
         }
 
     } catch (error) {
         console.error('Image editing error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Image editing failed',
-            details: error.message 
+            error: 'Image editing failed' 
         });
     }
 });
@@ -421,14 +409,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             });
         }
 
-        // Process image if it's an image file
-        let processedFile = req.file;
         const isImage = /^image\//.test(req.file.mimetype);
-
         let thumbnailFilename = null;
 
         if (isImage) {
-            // Create thumbnail
             thumbnailFilename = `thumb-${req.file.filename}`;
             const thumbnailPath = path.join('uploads', thumbnailFilename);
             
@@ -454,13 +438,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         console.error('Upload error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'File upload failed',
-            details: error.message 
+            error: 'File upload failed' 
         });
     }
 });
 
-// File download endpoint - FIXED to return proper JSON
+// File download endpoint
 app.get('/api/download/:filename', (req, res) => {
     try {
         const filename = req.params.filename;
@@ -473,22 +456,13 @@ app.get('/api/download/:filename', (req, res) => {
             });
         }
 
-        res.download(filePath, (err) => {
-            if (err) {
-                console.error('Download error:', err);
-                res.status(500).json({ 
-                    success: false,
-                    error: 'File download failed' 
-                });
-            }
-        });
+        res.download(filePath);
 
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'File download failed',
-            details: error.message 
+            error: 'File download failed' 
         });
     }
 });
@@ -525,8 +499,7 @@ app.get('/api/files', (req, res) => {
         console.error('Files list error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Could not retrieve files list',
-            details: error.message 
+            error: 'Could not retrieve files list' 
         });
     }
 });
@@ -562,33 +535,63 @@ app.delete('/api/files/:filename', (req, res) => {
         console.error('Delete error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'File deletion failed',
-            details: error.message 
+            error: 'File deletion failed' 
+        });
+    }
+});
+
+// Validate API key endpoint
+app.post('/api/validate-key', validateApiKey, async (req, res) => {
+    try {
+        const apiKey = req.apiKey;
+
+        const response = await fetch('https://openrouter.ai/api/v1/auth/key', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            }
+        });
+
+        if (response.ok) {
+            res.json({ 
+                success: true,
+                message: 'API key is valid' 
+            });
+        } else {
+            res.status(401).json({ 
+                success: false,
+                error: 'Invalid API key' 
+            });
+        }
+
+    } catch (error) {
+        console.error('API key validation error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Validation service unavailable' 
         });
     }
 });
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    const apiKeyConfigured = !!process.env.OPENROUTER_API_KEY;
     const uploadsAvailable = fs.existsSync(uploadsDir);
     
     res.json({ 
         success: true,
         status: 'OK', 
-        apiKeyConfigured: apiKeyConfigured,
         uploadsAvailable: uploadsAvailable,
         timestamp: new Date().toISOString(),
-        models: Object.keys(MODEL_CONFIG)
+        message: 'Server ready - configure your API key in settings'
     });
 });
 
-// Serve frontend for all other routes
+// Serve frontend
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Error handling middleware for multer
+// Error handling
 app.use((error, req, res, next) => {
     if (error instanceof multer.MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
@@ -602,12 +605,11 @@ app.use((error, req, res, next) => {
     console.error('Unhandled error:', error);
     res.status(500).json({ 
         success: false,
-        error: 'Internal server error',
-        details: error.message 
+        error: 'Internal server error' 
     });
 });
 
-// 404 handler for API routes
+// 404 handler
 app.use('/api/*', (req, res) => {
     res.status(404).json({
         success: false,
@@ -615,20 +617,9 @@ app.use('/api/*', (req, res) => {
     });
 });
 
-// Startup validation
-if (!process.env.OPENROUTER_API_KEY) {
-    console.warn('⚠️  WARNING: OPENROUTER_API_KEY environment variable is not set!');
-    console.warn('   Create a .env file with: OPENROUTER_API_KEY=your_key_here');
-}
-
 app.listen(PORT, () => {
-    console.log(`🚀 Advanced AI Server running on port ${PORT}`);
+    console.log(`🚀 Full-Featured AI Server running on port ${PORT}`);
     console.log(`📱 Open http://localhost:${PORT} in your browser`);
-    console.log(`🖼️  Image uploads directory: ${uploadsDir}`);
-    
-    if (process.env.OPENROUTER_API_KEY) {
-        console.log('✅ OpenRouter API key is configured');
-    } else {
-        console.log('❌ OpenRouter API key is NOT configured');
-    }
+    console.log(`🖼️  Uploads directory: ${uploadsDir}`);
+    console.log(`🔐 Users will enter their API keys in the browser`);
 });
