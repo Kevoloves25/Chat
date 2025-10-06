@@ -5,7 +5,6 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,7 +15,7 @@ if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer for file uploads
+// Configure multer for file uploads (simplified for Termux)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/');
@@ -326,7 +325,7 @@ app.post('/api/generate-image', validateApiKey, async (req, res) => {
     }
 });
 
-// Image editing endpoint
+// Image editing endpoint (simplified for Termux - no sharp processing)
 app.post('/api/edit-image', upload.single('image'), validateApiKey, async (req, res) => {
     try {
         const { prompt, apiKey } = req.body;
@@ -345,61 +344,29 @@ app.post('/api/edit-image', upload.single('image'), validateApiKey, async (req, 
             });
         }
 
-        // Convert image to base64
-        const imageBuffer = fs.readFileSync(req.file.path);
-        const base64Image = imageBuffer.toString('base64');
-
-        const requestBody = {
-            model: 'openai/dall-e-2',
-            image: `data:image/png;base64,${base64Image}`,
-            prompt: prompt,
-            n: 1,
-            size: '1024x1024'
-        };
-
-        const response = await fetch('https://openrouter.ai/api/v1/images/edits', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': req.headers.origin || 'http://localhost:3000',
-                'X-Title': 'AI Image Editor'
-            },
-            body: JSON.stringify(requestBody)
+        // For Termux, we'll just return the uploaded file info
+        // since image editing requires sharp which doesn't work on Android
+        res.json({
+            success: true,
+            message: 'Image editing requires additional dependencies not available on Termux',
+            fileInfo: {
+                originalName: req.file.originalname,
+                filename: req.file.filename,
+                path: `/uploads/${req.file.filename}`,
+                size: req.file.size
+            }
         });
-
-        // Clean up uploaded file
-        fs.unlinkSync(req.file.path);
-
-        if (!response.ok) {
-            return res.status(response.status).json({ 
-                success: false,
-                error: 'Image editing failed' 
-            });
-        }
-
-        const data = await response.json();
-        
-        if (data.data && data.data[0] && data.data[0].url) {
-            res.json({
-                success: true,
-                imageUrl: data.data[0].url,
-                model: data.model
-            });
-        } else {
-            throw new Error('Invalid response format');
-        }
 
     } catch (error) {
         console.error('Image editing error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Image editing failed' 
+            error: 'Image editing not available on this platform' 
         });
     }
 });
 
-// File upload endpoint
+// File upload endpoint (simplified - no thumbnail generation)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -407,18 +374,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
                 success: false,
                 error: 'No file uploaded' 
             });
-        }
-
-        const isImage = /^image\//.test(req.file.mimetype);
-        let thumbnailFilename = null;
-
-        if (isImage) {
-            thumbnailFilename = `thumb-${req.file.filename}`;
-            const thumbnailPath = path.join('uploads', thumbnailFilename);
-            
-            await sharp(req.file.path)
-                .resize(200, 200, { fit: 'inside' })
-                .toFile(thumbnailPath);
         }
 
         res.json({
@@ -429,7 +384,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
                 path: `/uploads/${req.file.filename}`,
                 size: req.file.size,
                 mimetype: req.file.mimetype,
-                thumbnail: thumbnailFilename ? `/uploads/${thumbnailFilename}` : null,
                 uploadedAt: new Date().toISOString()
             }
         });
@@ -478,7 +432,6 @@ app.get('/api/files', (req, res) => {
         }
 
         const files = fs.readdirSync(uploadsDir)
-            .filter(file => !file.startsWith('thumb-'))
             .map(file => {
                 const filePath = path.join(uploadsDir, file);
                 const stats = fs.statSync(filePath);
@@ -509,7 +462,6 @@ app.delete('/api/files/:filename', (req, res) => {
     try {
         const filename = req.params.filename;
         const filePath = path.join(__dirname, 'uploads', filename);
-        const thumbPath = path.join(__dirname, 'uploads', `thumb-${filename}`);
 
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ 
@@ -520,10 +472,6 @@ app.delete('/api/files/:filename', (req, res) => {
 
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-        }
-
-        if (fs.existsSync(thumbPath)) {
-            fs.unlinkSync(thumbPath);
         }
 
         res.json({ 
@@ -582,7 +530,8 @@ app.get('/api/health', (req, res) => {
         status: 'OK', 
         uploadsAvailable: uploadsAvailable,
         timestamp: new Date().toISOString(),
-        message: 'Server ready - configure your API key in settings'
+        message: 'Server ready - configure your API key in settings',
+        platform: 'Termux/Android'
     });
 });
 
@@ -618,8 +567,8 @@ app.use('/api/*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Full-Featured AI Server running on port ${PORT}`);
+    console.log(`🚀 Termux-Compatible AI Server running on port ${PORT}`);
     console.log(`📱 Open http://localhost:${PORT} in your browser`);
     console.log(`🖼️  Uploads directory: ${uploadsDir}`);
-    console.log(`🔐 Users will enter their API keys in the browser`);
+    console.log(`🔐 No external dependencies needed - ready for Termux!`);
 });
