@@ -5,9 +5,8 @@ class AdvancedAIChat {
         this.isGenerating = false;
         this.currentMode = 'chat';
         this.jsonMode = false;
-        this.uploadedImage = null;
-        this.currentPreviewImage = null;
         this.userApiKey = null;
+        this.currentPreviewImage = null;
         this.initializeApp();
     }
 
@@ -27,15 +26,19 @@ class AdvancedAIChat {
 
     loadUserSettings() {
         this.userApiKey = localStorage.getItem('user_api_key');
+        console.log('Loaded API key from storage:', this.userApiKey ? 'Yes' : 'No');
     }
 
     saveUserSettings() {
         if (this.userApiKey) {
             localStorage.setItem('user_api_key', this.userApiKey);
+            console.log('Saved API key to storage');
         }
     }
 
     attachEventListeners() {
+        console.log('Attaching event listeners...');
+        
         // Chat management
         document.getElementById('newChatBtn').addEventListener('click', () => this.createNewChat());
         document.getElementById('clearChatBtn').addEventListener('click', () => this.clearCurrentChat());
@@ -44,7 +47,6 @@ class AdvancedAIChat {
         // Send buttons
         document.getElementById('sendButton').addEventListener('click', () => this.sendMessage());
         document.getElementById('generateImageBtn').addEventListener('click', () => this.generateImage());
-        document.getElementById('editImageBtn').addEventListener('click', () => this.editImage());
         
         // Mode switching
         document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -66,22 +68,14 @@ class AdvancedAIChat {
             });
         });
 
-        // File management
-        document.getElementById('filesBtn').addEventListener('click', () => this.openFilesModal());
-        document.getElementById('closeFiles').addEventListener('click', () => this.closeFilesModal());
-        document.getElementById('fileUpload').addEventListener('change', (e) => this.handleFileUpload(e));
-        document.getElementById('uploadBtn').addEventListener('click', () => this.triggerFileUpload());
-
-        // Image handling
-        document.getElementById('uploadArea').addEventListener('click', () => this.triggerImageUpload());
-        document.getElementById('imageUpload').addEventListener('change', (e) => this.handleImageUpload(e));
-        document.getElementById('closeImage').addEventListener('click', () => this.closeImageModal());
-        document.getElementById('downloadImage').addEventListener('click', () => this.downloadCurrentImage());
-
         // Settings
         document.getElementById('settingsBtn').addEventListener('click', () => this.openApiKeyModal());
         document.getElementById('closeApiKey').addEventListener('click', () => this.closeApiKeyModal());
         document.getElementById('saveApiKey').addEventListener('click', () => this.saveApiKey());
+
+        // Image handling
+        document.getElementById('closeImage').addEventListener('click', () => this.closeImageModal());
+        document.getElementById('downloadImage').addEventListener('click', () => this.downloadCurrentImage());
 
         // Mobile menu
         document.getElementById('menuToggle').addEventListener('click', () => this.toggleSidebar());
@@ -90,15 +84,14 @@ class AdvancedAIChat {
         document.getElementById('modelSelect').addEventListener('change', () => this.onModelChange());
 
         // Close modals on outside click
-        document.getElementById('filesModal').addEventListener('click', (e) => {
-            if (e.target.id === 'filesModal') this.closeFilesModal();
+        document.getElementById('apiKeyModal').addEventListener('click', (e) => {
+            if (e.target.id === 'apiKeyModal') this.closeApiKeyModal();
         });
         document.getElementById('imageModal').addEventListener('click', (e) => {
             if (e.target.id === 'imageModal') this.closeImageModal();
         });
-        document.getElementById('apiKeyModal').addEventListener('click', (e) => {
-            if (e.target.id === 'apiKeyModal') this.closeApiKeyModal();
-        });
+
+        console.log('All event listeners attached');
     }
 
     setMode(mode) {
@@ -111,7 +104,6 @@ class AdvancedAIChat {
         
         document.getElementById('chatInput').classList.toggle('active', mode === 'chat');
         document.getElementById('imageInput').classList.toggle('active', mode === 'image');
-        document.getElementById('editInput').classList.toggle('active', mode === 'edit');
 
         // Clear input fields when switching modes
         if (mode !== 'chat') {
@@ -120,9 +112,6 @@ class AdvancedAIChat {
         if (mode !== 'image') {
             document.getElementById('imagePrompt').value = '';
         }
-        if (mode !== 'edit') {
-            document.getElementById('editPrompt').value = '';
-        }
     }
 
     toggleJsonMode() {
@@ -130,6 +119,7 @@ class AdvancedAIChat {
         const btn = document.getElementById('jsonModeBtn');
         btn.classList.toggle('active', this.jsonMode);
         btn.title = this.jsonMode ? 'JSON Mode: ON' : 'JSON Mode: OFF';
+        this.showToast(this.jsonMode ? 'JSON Mode Enabled' : 'JSON Mode Disabled');
     }
 
     async checkServerStatus() {
@@ -139,6 +129,7 @@ class AdvancedAIChat {
             
             this.updateServerStatus();
         } catch (error) {
+            console.error('Server status check failed:', error);
             const statusElement = document.getElementById('serverStatus');
             statusElement.innerHTML = '<i class="fas fa-circle" style="color: #ef4444"></i><span>Server Offline</span>';
         }
@@ -154,8 +145,10 @@ class AdvancedAIChat {
     }
 
     openApiKeyModal() {
+        console.log('Opening API key modal');
         document.getElementById('apiKeyModal').style.display = 'block';
         document.getElementById('userApiKey').value = this.userApiKey || '';
+        document.getElementById('userApiKey').focus();
     }
 
     closeApiKeyModal() {
@@ -163,8 +156,11 @@ class AdvancedAIChat {
     }
 
     async saveApiKey() {
+        console.log('Save API key button clicked');
         const apiKeyInput = document.getElementById('userApiKey');
         const apiKey = apiKeyInput.value.trim();
+        
+        console.log('API key entered:', apiKey ? 'Yes' : 'No');
         
         if (!apiKey) {
             this.showToast('Please enter your API key');
@@ -174,13 +170,20 @@ class AdvancedAIChat {
         this.showToast('Validating API key...');
         
         try {
+            console.log('Validating API key with server...');
             const response = await fetch('/api/validate-key', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify({ apiKey })
             });
 
+            console.log('Validation response status:', response.status);
+            
             const data = await response.json();
+            console.log('Validation response data:', data);
             
             if (data.success) {
                 this.userApiKey = apiKey;
@@ -188,10 +191,12 @@ class AdvancedAIChat {
                 this.closeApiKeyModal();
                 this.showToast('✅ API key validated and saved!');
                 this.updateServerStatus();
+                console.log('API key saved successfully');
             } else {
                 throw new Error(data.error || 'Invalid API key');
             }
         } catch (error) {
+            console.error('API key validation error:', error);
             this.showToast(`❌ ${error.message}`);
         }
     }
@@ -257,7 +262,6 @@ class AdvancedAIChat {
             
             let typeIcon = 'fa-comment';
             if (chat.messages.some(m => m.type === 'image')) typeIcon = 'fa-image';
-            else if (chat.messages.some(m => m.type === 'edit')) typeIcon = 'fa-edit';
             
             chatElement.innerHTML = `
                 <i class="fas ${typeIcon}"></i>
@@ -304,8 +308,8 @@ class AdvancedAIChat {
                 <div class="welcome-icon">
                     <i class="fas fa-robot"></i>
                 </div>
-                <h2>Welcome to AI Studio</h2>
-                <p>Chat with AI, generate images, or edit existing ones</p>
+                <h2>Welcome to AI Chat</h2>
+                <p>Chat with AI or generate images - optimized for Termux</p>
                 <div class="feature-grid">
                     <div class="feature-card">
                         <i class="fas fa-comments"></i>
@@ -316,11 +320,6 @@ class AdvancedAIChat {
                         <i class="fas fa-image"></i>
                         <h4>Image Generation</h4>
                         <p>Create images from text prompts</p>
-                    </div>
-                    <div class="feature-card">
-                        <i class="fas fa-edit"></i>
-                        <h4>Image Editing</h4>
-                        <p>Modify and enhance images</p>
                     </div>
                 </div>
             </div>
@@ -386,7 +385,10 @@ class AdvancedAIChat {
         try {
             const response = await fetch('/api/generate-image', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify({ 
                     prompt, 
                     size, 
@@ -415,57 +417,6 @@ class AdvancedAIChat {
         }
     }
 
-    async editImage() {
-        if (this.isGenerating || !this.uploadedImage) return;
-
-        if (!this.userApiKey) {
-            this.showToast('Please configure your API key first');
-            this.openApiKeyModal();
-            return;
-        }
-
-        const prompt = document.getElementById('editPrompt').value.trim();
-        
-        if (!prompt) {
-            this.showToast('Please describe how to edit the image');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('image', this.uploadedImage.file);
-        formData.append('prompt', prompt);
-        formData.append('apiKey', this.userApiKey);
-
-        this.addMessage('user', `Edit image: ${prompt}`, 'image_edit');
-
-        this.showTypingIndicator();
-
-        try {
-            const response = await fetch('/api/edit-image', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || `Image editing failed: ${response.statusText}`);
-            }
-
-            if (!data.success) {
-                throw new Error(data.error || 'Image editing failed');
-            }
-
-            this.removeTypingIndicator();
-            this.addImageMessage(data.imageUrl, `Edited: ${prompt}`, 'assistant');
-            this.updateChatTitleFromFirstMessage(`Edited: ${prompt}`);
-            
-        } catch (error) {
-            this.removeTypingIndicator();
-            this.addMessage('assistant', `Image editing failed: ${error.message}`, 'text');
-        }
-    }
-
     async generateAIResponse(userMessage) {
         const model = document.getElementById('modelSelect').value;
         const currentChat = this.chats.get(this.currentChatId);
@@ -489,7 +440,10 @@ class AdvancedAIChat {
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify(requestBody)
             });
 
@@ -542,8 +496,8 @@ class AdvancedAIChat {
 
         let messageContent = '';
         
-        if (type === 'image' || type === 'image_generation' || type === 'image_edit') {
-            messageContent = this.createImageMessage(content, type === 'image_generation' ? 'Generated Image' : 'Edited Image');
+        if (type === 'image' || type === 'image_generation') {
+            messageContent = this.createImageMessage(content, 'Generated Image');
         } else {
             messageContent = `<div class="message-content">${this.formatMessage(content)}</div>`;
         }
@@ -763,128 +717,6 @@ class AdvancedAIChat {
         this.addMessage(role, content, type);
     }
 
-    // File Management Methods
-    async openFilesModal() {
-        await this.loadFiles();
-        document.getElementById('filesModal').style.display = 'block';
-    }
-
-    closeFilesModal() {
-        document.getElementById('filesModal').style.display = 'none';
-    }
-
-    async loadFiles() {
-        try {
-            const response = await fetch('/api/files');
-            const data = await response.json();
-            
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load files');
-            }
-            
-            const filesGrid = document.getElementById('filesGrid');
-            filesGrid.innerHTML = '';
-            
-            if (data.files && data.files.length > 0) {
-                data.files.forEach(file => {
-                    const fileElement = document.createElement('div');
-                    fileElement.className = 'file-item';
-                    fileElement.innerHTML = `
-                        ${file.isImage ? 
-                            `<img src="${file.path}" alt="${file.filename}" class="file-thumbnail">` :
-                            `<div class="file-thumbnail" style="display: flex; align-items: center; justify-content: center; background: var(--accent-purple);">
-                                <i class="fas fa-file" style="font-size: 2rem;"></i>
-                            </div>`
-                        }
-                        <div class="file-name">${file.filename}</div>
-                        <div class="file-size">${this.formatFileSize(file.size)}</div>
-                    `;
-                    fileElement.addEventListener('click', () => this.previewFile(file));
-                    filesGrid.appendChild(fileElement);
-                });
-            } else {
-                filesGrid.innerHTML = '<p style="text-align: center; color: var(--text-gray);">No files uploaded yet</p>';
-            }
-        } catch (error) {
-            console.error('Error loading files:', error);
-            const filesGrid = document.getElementById('filesGrid');
-            filesGrid.innerHTML = `<p style="text-align: center; color: var(--error);">Error loading files: ${error.message}</p>`;
-        }
-    }
-
-    async handleFileUpload(event) {
-        const files = event.target.files;
-        for (let file of files) {
-            await this.uploadFile(file);
-        }
-        await this.loadFiles();
-    }
-
-    async uploadFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'Upload failed');
-            }
-
-            if (!data.success) {
-                throw new Error(data.error || 'Upload failed');
-            }
-
-            this.showToast('File uploaded successfully');
-        } catch (error) {
-            this.showToast('Upload failed: ' + error.message);
-        }
-    }
-
-    triggerFileUpload() {
-        document.getElementById('fileUpload').click();
-    }
-
-    triggerImageUpload() {
-        document.getElementById('imageUpload').click();
-    }
-
-    async handleImageUpload(event) {
-        const file = event.target.files[0];
-        if (file) {
-            this.uploadedImage = {
-                file: file,
-                url: URL.createObjectURL(file)
-            };
-            
-            document.getElementById('imagePreview').src = this.uploadedImage.url;
-            document.getElementById('editOptions').style.display = 'block';
-            document.getElementById('uploadArea').style.display = 'none';
-        }
-    }
-
-    previewFile(file) {
-        if (file.isImage) {
-            this.previewImage(file.path);
-        } else {
-            // Handle non-image files
-            window.open(file.path, '_blank');
-        }
-    }
-
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
     updateChatTitleFromFirstMessage(firstMessage) {
         const currentChat = this.chats.get(this.currentChatId);
         if (currentChat.messages.length === 2 && currentChat.title === 'New Chat') {
@@ -966,5 +798,6 @@ class AdvancedAIChat {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing app...');
     window.app = new AdvancedAIChat();
 });
