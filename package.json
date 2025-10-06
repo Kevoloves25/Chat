@@ -1,7 +1,7 @@
 {
-  "name": "advanced-ai-chat",
+  "name": "ai-chat-complete",
   "version": "1.0.0",
-  "description": "Advanced AI chat with image generation and file management",
+  "description": "Complete AI chat with image generation and file management",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -13,8 +13,7 @@
     "helmet": "^7.0.0",
     "express-rate-limit": "^6.8.1",
     "multer": "^1.4.5-lts.1",
-    "sharp": "^0.32.6",
-    "dotenv": "^16.3.1"
+    "sharp": "^0.32.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
