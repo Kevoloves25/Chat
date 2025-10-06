@@ -18,7 +18,6 @@ class AdvancedAIChat {
         this.checkServerStatus();
         this.setMode('chat');
         
-        // Show API key modal if not configured
         if (!this.userApiKey) {
             setTimeout(() => this.openApiKeyModal(), 1000);
         }
@@ -26,19 +25,15 @@ class AdvancedAIChat {
 
     loadUserSettings() {
         this.userApiKey = localStorage.getItem('user_api_key');
-        console.log('Loaded API key from storage:', this.userApiKey ? 'Yes' : 'No');
     }
 
     saveUserSettings() {
         if (this.userApiKey) {
             localStorage.setItem('user_api_key', this.userApiKey);
-            console.log('Saved API key to storage');
         }
     }
 
     attachEventListeners() {
-        console.log('Attaching event listeners...');
-        
         // Chat management
         document.getElementById('newChatBtn').addEventListener('click', () => this.createNewChat());
         document.getElementById('clearChatBtn').addEventListener('click', () => this.clearCurrentChat());
@@ -53,18 +48,6 @@ class AdvancedAIChat {
             btn.addEventListener('click', (e) => {
                 const mode = e.currentTarget.dataset.mode;
                 this.setMode(mode);
-            });
-        });
-
-        // Message input
-        const messageInput = document.getElementById('messageInput');
-        messageInput.addEventListener('keydown', (e) => this.handleInputKeydown(e));
-        messageInput.addEventListener('input', () => this.autoResizeTextarea());
-
-        // Formatting buttons
-        document.querySelectorAll('.format-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.applyFormatting(e.currentTarget.dataset.format);
             });
         });
 
@@ -90,14 +73,11 @@ class AdvancedAIChat {
         document.getElementById('imageModal').addEventListener('click', (e) => {
             if (e.target.id === 'imageModal') this.closeImageModal();
         });
-
-        console.log('All event listeners attached');
     }
 
     setMode(mode) {
         this.currentMode = mode;
         
-        // Update UI
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.mode === mode);
         });
@@ -105,7 +85,6 @@ class AdvancedAIChat {
         document.getElementById('chatInput').classList.toggle('active', mode === 'chat');
         document.getElementById('imageInput').classList.toggle('active', mode === 'image');
 
-        // Clear input fields when switching modes
         if (mode !== 'chat') {
             document.getElementById('messageInput').value = '';
         }
@@ -118,18 +97,15 @@ class AdvancedAIChat {
         this.jsonMode = !this.jsonMode;
         const btn = document.getElementById('jsonModeBtn');
         btn.classList.toggle('active', this.jsonMode);
-        btn.title = this.jsonMode ? 'JSON Mode: ON' : 'JSON Mode: OFF';
         this.showToast(this.jsonMode ? 'JSON Mode Enabled' : 'JSON Mode Disabled');
     }
 
     async checkServerStatus() {
         try {
             const response = await fetch('/api/health');
-            const data = await response.json();
-            
+            await response.json();
             this.updateServerStatus();
         } catch (error) {
-            console.error('Server status check failed:', error);
             const statusElement = document.getElementById('serverStatus');
             statusElement.innerHTML = '<i class="fas fa-circle" style="color: #ef4444"></i><span>Server Offline</span>';
         }
@@ -138,17 +114,15 @@ class AdvancedAIChat {
     updateServerStatus() {
         const statusElement = document.getElementById('serverStatus');
         if (this.userApiKey) {
-            statusElement.innerHTML = '<i class="fas fa-circle" style="color: #10b981"></i><span>Ready - API Key Configured</span>';
+            statusElement.innerHTML = '<i class="fas fa-circle" style="color: #10b981"></i><span>Ready</span>';
         } else {
             statusElement.innerHTML = '<i class="fas fa-circle" style="color: #f59e0b"></i><span>API Key Required</span>';
         }
     }
 
     openApiKeyModal() {
-        console.log('Opening API key modal');
         document.getElementById('apiKeyModal').style.display = 'block';
         document.getElementById('userApiKey').value = this.userApiKey || '';
-        document.getElementById('userApiKey').focus();
     }
 
     closeApiKeyModal() {
@@ -156,11 +130,8 @@ class AdvancedAIChat {
     }
 
     async saveApiKey() {
-        console.log('Save API key button clicked');
         const apiKeyInput = document.getElementById('userApiKey');
         const apiKey = apiKeyInput.value.trim();
-        
-        console.log('API key entered:', apiKey ? 'Yes' : 'No');
         
         if (!apiKey) {
             this.showToast('Please enter your API key');
@@ -170,33 +141,24 @@ class AdvancedAIChat {
         this.showToast('Validating API key...');
         
         try {
-            console.log('Validating API key with server...');
             const response = await fetch('/api/validate-key', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ apiKey })
             });
 
-            console.log('Validation response status:', response.status);
-            
             const data = await response.json();
-            console.log('Validation response data:', data);
             
             if (data.success) {
                 this.userApiKey = apiKey;
                 this.saveUserSettings();
                 this.closeApiKeyModal();
-                this.showToast('✅ API key validated and saved!');
+                this.showToast('✅ API key saved!');
                 this.updateServerStatus();
-                console.log('API key saved successfully');
             } else {
                 throw new Error(data.error || 'Invalid API key');
             }
         } catch (error) {
-            console.error('API key validation error:', error);
             this.showToast(`❌ ${error.message}`);
         }
     }
@@ -207,7 +169,6 @@ class AdvancedAIChat {
             id: chatId,
             title: 'New Chat',
             messages: [],
-            mode: this.currentMode,
             createdAt: new Date().toISOString()
         };
         
@@ -229,7 +190,6 @@ class AdvancedAIChat {
                 const chatsArray = JSON.parse(savedChats);
                 this.chats = new Map(chatsArray.map(chat => [chat.id, chat]));
             } catch (e) {
-                console.error('Error loading chats:', e);
                 this.chats = new Map();
             }
         }
@@ -309,7 +269,7 @@ class AdvancedAIChat {
                     <i class="fas fa-robot"></i>
                 </div>
                 <h2>Welcome to AI Chat</h2>
-                <p>Chat with AI or generate images - optimized for Termux</p>
+                <p>Chat with AI or generate images</p>
                 <div class="feature-grid">
                     <div class="feature-card">
                         <i class="fas fa-comments"></i>
@@ -340,7 +300,8 @@ class AdvancedAIChat {
         
         if (!message) return;
 
-        this.addMessage('user', message, 'text');
+        // Add user message to display only
+        this.addMessageToDisplay('user', message, 'text', true);
         messageInput.value = '';
         this.autoResizeTextarea();
 
@@ -349,7 +310,9 @@ class AdvancedAIChat {
         try {
             const response = await this.generateAIResponse(message);
             this.removeTypingIndicator();
-            await this.typeMessage(response, 'assistant', 'text');
+            
+            // Add AI response to both display and storage
+            this.addMessage('assistant', response, 'text');
             
             this.updateChatTitleFromFirstMessage(message);
             
@@ -377,7 +340,8 @@ class AdvancedAIChat {
             return;
         }
 
-        this.addMessage('user', `Generate image: ${prompt}`, 'image_generation');
+        // Add user message to display only
+        this.addMessageToDisplay('user', `Generate image: ${prompt}`, 'image_generation', true);
         document.getElementById('imagePrompt').value = '';
 
         this.showTypingIndicator();
@@ -385,10 +349,7 @@ class AdvancedAIChat {
         try {
             const response = await fetch('/api/generate-image', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     prompt, 
                     size, 
@@ -400,7 +361,7 @@ class AdvancedAIChat {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.error || `Image generation failed: ${response.statusText}`);
+                throw new Error(data.error || 'Image generation failed');
             }
 
             if (!data.success) {
@@ -408,7 +369,10 @@ class AdvancedAIChat {
             }
 
             this.removeTypingIndicator();
-            this.addImageMessage(data.imageUrl, prompt, 'assistant');
+            
+            // Add image to both display and storage
+            this.addMessage('assistant', data.imageUrl, 'image', data.revisedPrompt || prompt);
+            
             this.updateChatTitleFromFirstMessage(`Image: ${prompt}`);
             
         } catch (error) {
@@ -420,12 +384,18 @@ class AdvancedAIChat {
     async generateAIResponse(userMessage) {
         const model = document.getElementById('modelSelect').value;
         const currentChat = this.chats.get(this.currentChatId);
-        const messages = currentChat.messages
-            .filter(msg => msg.role !== 'system')
-            .map(msg => ({
-                role: msg.role,
-                content: msg.content
-            }));
+        
+        // Prepare messages for API (only stored messages)
+        const messages = currentChat.messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+        }));
+
+        // Add the new user message to the API request
+        messages.push({
+            role: 'user',
+            content: userMessage
+        });
 
         const requestBody = {
             messages: messages,
@@ -437,48 +407,46 @@ class AdvancedAIChat {
             requestBody.format = 'json';
         }
 
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
 
-            const data = await response.json();
-            
-            if (!response.ok) {
-                if (response.status === 401) {
-                    this.userApiKey = null;
-                    localStorage.removeItem('user_api_key');
-                    this.openApiKeyModal();
-                    throw new Error('API key invalid. Please update your API key.');
-                }
-                throw new Error(data.error || `Request failed: ${response.statusText}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                this.userApiKey = null;
+                localStorage.removeItem('user_api_key');
+                this.openApiKeyModal();
+                throw new Error('API key invalid. Please update your API key.');
             }
+            throw new Error(data.error || 'Request failed');
+        }
 
-            if (!data.success) {
-                throw new Error(data.error || 'Request failed');
-            }
+        if (!data.success) {
+            throw new Error(data.error || 'Request failed');
+        }
 
-            return data.content;
+        return data.content;
+    }
 
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
+    addMessage(role, content, type = 'text', caption = null) {
+        const currentChat = this.chats.get(this.currentChatId);
+        const messageData = { role, content, type };
+        if (caption) messageData.caption = caption;
+        
+        currentChat.messages.push(messageData);
+        this.saveChats();
+        
+        // Only add to display if it's not already displayed
+        if (role === 'assistant') {
+            this.addMessageToDisplay(role, content, type, true, caption);
         }
     }
 
-    addMessage(role, content, type = 'text') {
-        const currentChat = this.chats.get(this.currentChatId);
-        currentChat.messages.push({ role, content, type });
-        this.saveChats();
-        this.addMessageToDisplay(role, content, type, true);
-    }
-
-    addMessageToDisplay(role, content, type = 'text', animate = true) {
+    addMessageToDisplay(role, content, type = 'text', animate = true, caption = null) {
         const chatMessages = document.getElementById('chatMessages');
         
         // Remove welcome message if present
@@ -496,8 +464,8 @@ class AdvancedAIChat {
 
         let messageContent = '';
         
-        if (type === 'image' || type === 'image_generation') {
-            messageContent = this.createImageMessage(content, 'Generated Image');
+        if (type === 'image') {
+            messageContent = this.createImageMessage(content, caption || 'Generated Image');
         } else {
             messageContent = `<div class="message-content">${this.formatMessage(content)}</div>`;
         }
@@ -514,18 +482,6 @@ class AdvancedAIChat {
         }
     }
 
-    addImageMessage(imageUrl, caption, role) {
-        const currentChat = this.chats.get(this.currentChatId);
-        currentChat.messages.push({ 
-            role, 
-            content: imageUrl, 
-            type: 'image',
-            caption: caption 
-        });
-        this.saveChats();
-        this.addMessageToDisplay(role, imageUrl, 'image', true);
-    }
-
     createImageMessage(imageUrl, caption) {
         return `
             <div class="image-message">
@@ -538,18 +494,11 @@ class AdvancedAIChat {
     formatMessage(content) {
         if (!content) return '';
         
-        // Enhanced formatting
         let formatted = content
-            // Bold text
             .replace(/\*(\*?[^*]+\*?)\*/g, '<strong class="bold-text">$1</strong>')
-            // Italic text
             .replace(/_([^_]+)_/g, '<em class="italic-text">$1</em>')
-            // Strikethrough
-            .replace(/~([^~]+)~/g, '<del class="strike-text">$1</del>')
-            // Inline code
             .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
         
-        // Code blocks
         formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
             const lang = language || 'text';
             return `
@@ -563,42 +512,12 @@ class AdvancedAIChat {
             `;
         });
 
-        // Blockquotes
         formatted = formatted.replace(/^> (.*$)/gim, '<blockquote class="quote-block">$1</blockquote>');
-        
-        // Lists
         formatted = formatted.replace(/^- (.*$)/gim, '<li class="list-item">$1</li>');
         formatted = formatted.replace(/(<li class="list-item">.*<\/li>)/g, '<ul class="styled-list">$1</ul>');
-        
-        // Line breaks
         formatted = formatted.replace(/\n/g, '<br>');
 
         return formatted;
-    }
-
-    applyFormatting(type) {
-        const textarea = document.getElementById('messageInput');
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selectedText = textarea.value.substring(start, end);
-        
-        let formattedText = '';
-        const wrappers = {
-            bold: ['*', '*'],
-            italic: ['_', '_'],
-            code: ['`', '`'],
-            quote: ['> ', '']
-        };
-
-        if (wrappers[type]) {
-            const [startWrapper, endWrapper] = wrappers[type];
-            formattedText = startWrapper + selectedText + endWrapper;
-        }
-
-        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
-        textarea.focus();
-        textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
-        this.autoResizeTextarea();
     }
 
     escapeHtml(text) {
@@ -675,48 +594,6 @@ class AdvancedAIChat {
         }
     }
 
-    async typeMessage(content, role, type) {
-        const chatMessages = document.getElementById('chatMessages');
-        
-        if (type === 'image') {
-            this.addImageMessage(content, 'Generated Image', role);
-            return;
-        }
-        
-        const messageElement = document.createElement('div');
-        messageElement.className = `message ${role}`;
-        messageElement.innerHTML = `
-            <div class="message-avatar">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div class="message-content" id="streaming-content"></div>
-        `;
-        
-        chatMessages.appendChild(messageElement);
-        
-        const contentElement = messageElement.querySelector('#streaming-content');
-        let displayedContent = '';
-        
-        for (let i = 0; i < content.length; i++) {
-            if (!this.isGenerating) break;
-            
-            displayedContent += content[i];
-            contentElement.innerHTML = this.formatMessage(displayedContent);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            const char = content[i];
-            let delay = 10;
-            if (char === '\n') delay = 50;
-            if (char === '.' || char === '!' || char === '?') delay = 100;
-            
-            await this.delay(delay);
-        }
-        
-        contentElement.innerHTML = this.formatMessage(content);
-        contentElement.removeAttribute('id');
-        this.addMessage(role, content, type);
-    }
-
     updateChatTitleFromFirstMessage(firstMessage) {
         const currentChat = this.chats.get(this.currentChatId);
         if (currentChat.messages.length === 2 && currentChat.title === 'New Chat') {
@@ -729,8 +606,7 @@ class AdvancedAIChat {
     }
 
     onModelChange() {
-        const model = document.getElementById('modelSelect').value;
-        console.log('Model changed to:', model);
+        // Model changed - you can add specific behavior here
     }
 
     handleInputKeydown(e) {
@@ -777,7 +653,6 @@ class AdvancedAIChat {
             border-radius: 8px;
             z-index: 1000;
             font-size: 0.875rem;
-            animation: slideIn 0.3s ease;
         `;
         toast.textContent = message;
         document.body.appendChild(toast);
@@ -787,10 +662,6 @@ class AdvancedAIChat {
         }, 3000);
     }
 
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
     truncateText(text, maxLength) {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     }
@@ -798,6 +669,5 @@ class AdvancedAIChat {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing app...');
     window.app = new AdvancedAIChat();
 });
