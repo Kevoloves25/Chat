@@ -58,6 +58,9 @@
                 <button class="files-btn" id="filesBtn">
                     <i class="fas fa-folder"></i> Files
                 </button>
+                <button class="settings-btn" id="settingsBtn">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
             </div>
         </div>
 
@@ -227,6 +230,38 @@
                         <i class="fas fa-download"></i> Download
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div class="modal" id="apiKeyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>API Configuration</h3>
+                <button class="close-btn" id="closeApiKey">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setup-steps">
+                    <div class="step">
+                        <strong>1. Get OpenRouter API Key</strong>
+                        <p>Visit <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a> to get your free API key</p>
+                    </div>
+                    <div class="step">
+                        <strong>2. Enter Your API Key</strong>
+                        <p>Your key stays in your browser and is never stored on our servers</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="userApiKey">OpenRouter API Key</label>
+                    <input type="password" id="userApiKey" placeholder="sk-or-xxxxxxxxxxxxxxxxxxxxxxxx">
+                    <small style="color: var(--text-gray); margin-top: 0.5rem; display: block;">
+                        🔒 Your API key is stored locally in your browser only
+                    </small>
+                </div>
+                <button class="save-btn" id="saveApiKey">
+                    <i class="fas fa-save"></i> Save API Key
+                </button>
             </div>
         </div>
     </div>
