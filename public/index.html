@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AI Chat</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-robot"></i> AI Studio</h2>
+                <button class="new-chat-btn" id="newChatBtn">
+                    <i class="fas fa-plus"></i> New Chat
+                </button>
+            </div>
+            
+            <!-- Model Selector -->
+            <div class="model-selector">
+                <label for="modelSelect">AI Model:</label>
+                <select id="modelSelect">
+                    <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+                    <option value="deepseek/deepseek-coder">DeepSeek Coder</option>
+                    <option value="openai/gpt-4">GPT-4</option>
+                    <option value="anthropic/claude-3-sonnet">Claude 3</option>
+                </select>
+            </div>
+
+            <!-- Chat Mode Selector -->
+            <div class="mode-selector">
+                <label>Mode:</label>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" data-mode="chat">
+                        <i class="fas fa-comment"></i> Chat
+                    </button>
+                    <button class="mode-btn" data-mode="image">
+                        <i class="fas fa-image"></i> Image
+                    </button>
+                    <button class="mode-btn" data-mode="edit">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-history" id="chatHistory">
+                <!-- Chat history will be populated here -->
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="server-status" id="serverStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>Checking server...</span>
+                </div>
+                <button class="files-btn" id="filesBtn">
+                    <i class="fas fa-folder"></i> Files
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="header-left">
+                    <button class="menu-toggle" id="menuToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h3 id="currentChatTitle">New Chat</h3>
+                </div>
+                <div class="header-actions">
+                    <button class="action-btn" id="jsonModeBtn" title="JSON Mode">
+                        <i class="fas fa-code"></i>
+                    </button>
+                    <button class="action-btn" id="clearChatBtn" title="Clear Chat">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-message">
+                    <div class="welcome-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h2>Welcome to AI Studio</h2>
+                    <p>Chat with AI, generate images, or edit existing ones</p>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <i class="fas fa-comments"></i>
+                            <h4>AI Chat</h4>
+                            <p>Conversations with advanced formatting</p>
+                        </div>
+                        <div class="feature-card">
+                            <i class="fas fa-image"></i>
+                            <h4>Image Generation</h4>
+                            <p>Create images from text prompts</p>
+                        </div>
+                        <div class="feature-card">
+                            <i class="fas fa-edit"></i>
+                            <h4>Image Editing</h4>
+                            <p>Modify and enhance images</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-container active" id="chatInput">
+                <div class="input-wrapper">
+                    <div class="formatting-toolbar">
+                        <button class="format-btn" data-format="bold" title="Bold">
+                            <i class="fas fa-bold"></i>
+                        </button>
+                        <button class="format-btn" data-format="italic" title="Italic">
+                            <i class="fas fa-italic"></i>
+                        </button>
+                        <button class="format-btn" data-format="code" title="Code">
+                            <i class="fas fa-code"></i>
+                        </button>
+                        <button class="format-btn" data-format="quote" title="Quote">
+                            <i class="fas fa-quote-right"></i>
+                        </button>
+                    </div>
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Type your message... Use *bold*, _italic_, `code`, > quotes, - lists"
+                        rows="1"
+                    ></textarea>
+                    <div class="input-actions">
+                        <button class="action-btn upload-btn" id="uploadBtn" title="Upload File">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <button id="sendButton" class="send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="input-footer">
+                    <small>Press Shift + Enter for new line, Enter to send</small>
+                </div>
+            </div>
+
+            <!-- Image Generation Input -->
+            <div class="image-input-container" id="imageInput">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="imagePrompt" 
+                        placeholder="Describe the image you want to generate..."
+                        rows="3"
+                    ></textarea>
+                    <div class="image-options">
+                        <select id="imageSize">
+                            <option value="1024x1024">1024x1024</option>
+                            <option value="1792x1024">1792x1024</option>
+                            <option value="1024x1792">1024x1792</option>
+                        </select>
+                        <select id="imageQuality">
+                            <option value="standard">Standard</option>
+                            <option value="hd">HD</option>
+                        </select>
+                    </div>
+                    <button id="generateImageBtn" class="generate-btn">
+                        <i class="fas fa-magic"></i> Generate Image
+                    </button>
+                </div>
+            </div>
+
+            <!-- Image Edit Input -->
+            <div class="edit-input-container" id="editInput">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Drop an image here or click to upload</p>
+                    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                </div>
+                <div class="edit-options" id="editOptions" style="display: none;">
+                    <div class="preview-container">
+                        <img id="imagePreview" src="" alt="Preview">
+                    </div>
+                    <textarea 
+                        id="editPrompt" 
+                        placeholder="Describe how you want to edit the image..."
+                        rows="2"
+                    ></textarea>
+                    <button id="editImageBtn" class="generate-btn">
+                        <i class="fas fa-wand-magic-sparkles"></i> Edit Image
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Files Modal -->
+    <div class="modal" id="filesModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>File Manager</h3>
+                <button class="close-btn" id="closeFiles">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="files-grid" id="filesGrid">
+                    <!-- Files will be populated here -->
+                </div>
+                <div class="upload-section">
+                    <input type="file" id="fileUpload" multiple accept="image/*">
+                    <button class="upload-files-btn" onclick="document.getElementById('fileUpload').click()">
+                        <i class="fas fa-upload"></i> Upload Files
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div class="modal" id="imageModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>Image Preview</h3>
+                <button class="close-btn" id="closeImage">&times;</button>
+            </div>
+            <div class="modal-body">
+                <img id="modalImage" src="" alt="Preview" style="max-width: 100%; border-radius: 8px;">
+                <div class="image-actions">
+                    <button class="action-btn" id="downloadImage">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
