@@ -7,15 +7,32 @@ class AdvancedAIChat {
         this.jsonMode = false;
         this.uploadedImage = null;
         this.currentPreviewImage = null;
+        this.userApiKey = null;
         this.initializeApp();
     }
 
     initializeApp() {
+        this.loadUserSettings();
         this.loadChats();
         this.attachEventListeners();
         this.updateChatHistory();
         this.checkServerStatus();
         this.setMode('chat');
+        
+        // Show API key modal if not configured
+        if (!this.userApiKey) {
+            setTimeout(() => this.openApiKeyModal(), 1000);
+        }
+    }
+
+    loadUserSettings() {
+        this.userApiKey = localStorage.getItem('user_api_key');
+    }
+
+    saveUserSettings() {
+        if (this.userApiKey) {
+            localStorage.setItem('user_api_key', this.userApiKey);
+        }
     }
 
     attachEventListeners() {
@@ -61,6 +78,11 @@ class AdvancedAIChat {
         document.getElementById('closeImage').addEventListener('click', () => this.closeImageModal());
         document.getElementById('downloadImage').addEventListener('click', () => this.downloadCurrentImage());
 
+        // Settings
+        document.getElementById('settingsBtn').addEventListener('click', () => this.openApiKeyModal());
+        document.getElementById('closeApiKey').addEventListener('click', () => this.closeApiKeyModal());
+        document.getElementById('saveApiKey').addEventListener('click', () => this.saveApiKey());
+
         // Mobile menu
         document.getElementById('menuToggle').addEventListener('click', () => this.toggleSidebar());
 
@@ -73,6 +95,9 @@ class AdvancedAIChat {
         });
         document.getElementById('imageModal').addEventListener('click', (e) => {
             if (e.target.id === 'imageModal') this.closeImageModal();
+        });
+        document.getElementById('apiKeyModal').addEventListener('click', (e) => {
+            if (e.target.id === 'apiKeyModal') this.closeApiKeyModal();
         });
     }
 
@@ -112,15 +137,62 @@ class AdvancedAIChat {
             const response = await fetch('/api/health');
             const data = await response.json();
             
-            const statusElement = document.getElementById('serverStatus');
-            if (data.apiKeyConfigured) {
-                statusElement.innerHTML = '<i class="fas fa-circle" style="color: #10b981"></i><span>Server Connected</span>';
-            } else {
-                statusElement.innerHTML = '<i class="fas fa-circle" style="color: #ef4444"></i><span>API Key Needed</span>';
-            }
+            this.updateServerStatus();
         } catch (error) {
             const statusElement = document.getElementById('serverStatus');
             statusElement.innerHTML = '<i class="fas fa-circle" style="color: #ef4444"></i><span>Server Offline</span>';
+        }
+    }
+
+    updateServerStatus() {
+        const statusElement = document.getElementById('serverStatus');
+        if (this.userApiKey) {
+            statusElement.innerHTML = '<i class="fas fa-circle" style="color: #10b981"></i><span>Ready - API Key Configured</span>';
+        } else {
+            statusElement.innerHTML = '<i class="fas fa-circle" style="color: #f59e0b"></i><span>API Key Required</span>';
+        }
+    }
+
+    openApiKeyModal() {
+        document.getElementById('apiKeyModal').style.display = 'block';
+        document.getElementById('userApiKey').value = this.userApiKey || '';
+    }
+
+    closeApiKeyModal() {
+        document.getElementById('apiKeyModal').style.display = 'none';
+    }
+
+    async saveApiKey() {
+        const apiKeyInput = document.getElementById('userApiKey');
+        const apiKey = apiKeyInput.value.trim();
+        
+        if (!apiKey) {
+            this.showToast('Please enter your API key');
+            return;
+        }
+
+        this.showToast('Validating API key...');
+        
+        try {
+            const response = await fetch('/api/validate-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.userApiKey = apiKey;
+                this.saveUserSettings();
+                this.closeApiKeyModal();
+                this.showToast('✅ API key validated and saved!');
+                this.updateServerStatus();
+            } else {
+                throw new Error(data.error || 'Invalid API key');
+            }
+        } catch (error) {
+            this.showToast(`❌ ${error.message}`);
         }
     }
 
@@ -258,6 +330,12 @@ class AdvancedAIChat {
     async sendMessage() {
         if (this.isGenerating) return;
 
+        if (!this.userApiKey) {
+            this.showToast('Please configure your API key first');
+            this.openApiKeyModal();
+            return;
+        }
+
         const messageInput = document.getElementById('messageInput');
         const message = messageInput.value.trim();
         
@@ -285,6 +363,12 @@ class AdvancedAIChat {
     async generateImage() {
         if (this.isGenerating) return;
 
+        if (!this.userApiKey) {
+            this.showToast('Please configure your API key first');
+            this.openApiKeyModal();
+            return;
+        }
+
         const prompt = document.getElementById('imagePrompt').value.trim();
         const size = document.getElementById('imageSize').value;
         const quality = document.getElementById('imageQuality').value;
@@ -303,7 +387,12 @@ class AdvancedAIChat {
             const response = await fetch('/api/generate-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, size, quality })
+                body: JSON.stringify({ 
+                    prompt, 
+                    size, 
+                    quality,
+                    apiKey: this.userApiKey
+                })
             });
 
             const data = await response.json();
@@ -329,6 +418,12 @@ class AdvancedAIChat {
     async editImage() {
         if (this.isGenerating || !this.uploadedImage) return;
 
+        if (!this.userApiKey) {
+            this.showToast('Please configure your API key first');
+            this.openApiKeyModal();
+            return;
+        }
+
         const prompt = document.getElementById('editPrompt').value.trim();
         
         if (!prompt) {
@@ -339,6 +434,7 @@ class AdvancedAIChat {
         const formData = new FormData();
         formData.append('image', this.uploadedImage.file);
         formData.append('prompt', prompt);
+        formData.append('apiKey', this.userApiKey);
 
         this.addMessage('user', `Edit image: ${prompt}`, 'image_edit');
 
@@ -382,7 +478,8 @@ class AdvancedAIChat {
 
         const requestBody = {
             messages: messages,
-            model: model
+            model: model,
+            apiKey: this.userApiKey
         };
 
         if (this.jsonMode) {
@@ -399,7 +496,13 @@ class AdvancedAIChat {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.error || `Server error: ${response.statusText}`);
+                if (response.status === 401) {
+                    this.userApiKey = null;
+                    localStorage.removeItem('user_api_key');
+                    this.openApiKeyModal();
+                    throw new Error('API key invalid. Please update your API key.');
+                }
+                throw new Error(data.error || `Request failed: ${response.statusText}`);
             }
 
             if (!data.success) {
@@ -795,7 +898,6 @@ class AdvancedAIChat {
 
     onModelChange() {
         const model = document.getElementById('modelSelect').value;
-        // You can add model-specific behavior here
         console.log('Model changed to:', model);
     }
 
