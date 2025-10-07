@@ -230,7 +230,7 @@ app.post('/api/chat', validateApiKey, async (req, res) => {
 });
 
 // Image generation endpoint
-app.post('/api/generate-image', validateApiKey, async (req, res) => {
+/*app.post('/api/generate-image', validateApiKey, async (req, res) => {
     try {
         const { prompt, model = 'openai/dall-e-3', size = '1024x1024', quality = 'standard', apiKey } = req.body;
 
@@ -283,6 +283,65 @@ app.post('/api/generate-image', validateApiKey, async (req, res) => {
         res.status(500).json({ 
             success: false,
             error: 'Image generation failed' 
+        });
+    }
+});*/
+// Image generation endpoint
+app.post('/api/generate-image', validateApiKey, async (req, res) => {
+    try {
+        const { prompt, model = 'openai/dall-e-3', size = '1024x1024', quality = 'standard' } = req.body;
+        const apiKey = req.apiKey; // Get from middleware
+
+        if (!prompt) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Prompt is required' 
+            });
+        }
+
+        const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': req.headers.origin || 'http://localhost:3000',
+                'X-Title': 'AI Image Generator'
+            },
+            body: JSON.stringify({
+                model: model,
+                prompt: prompt,
+                size: size,
+                quality: quality,
+                n: 1
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            return res.status(response.status).json({ 
+                success: false,
+                error: errorData.error?.message || 'Image generation failed' 
+            });
+        }
+
+        const data = await response.json();
+        
+        if (data.data && data.data[0] && data.data[0].url) {
+            res.json({
+                success: true,
+                imageUrl: data.data[0].url,
+                revisedPrompt: data.data[0].revised_prompt,
+                model: data.model
+            });
+        } else {
+            throw new Error('Invalid response format');
+        }
+
+    } catch (error) {
+        console.error('Image generation error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Image generation failed: ' + error.message 
         });
     }
 });
